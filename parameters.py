@@ -5,7 +5,6 @@ import numpy as np
 @dataclass
 class Parameters:
     lwe_secret_dimension: int  # N
-    lwe_error_stddev: float  # sigma
 
     num_entries: int
     bits_per_entry: int

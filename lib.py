@@ -15,7 +15,7 @@ def rand_mat(rows: int, cols: int, logmod: int) -> np.ndarray:
         raise ValueError("logmod must be between 0 and 32 for uint32 output.")
     n = rows * cols
     buf = secrets.token_bytes(n * 4)
-    arr = np.frombuffer(buf, dtype=np.uint32, count=n)
+    arr = np.frombuffer(buf, dtype="<u4", count=n)
     if logmod < 32:
         mask = (1 << logmod) - 1
         arr &= mask
@@ -23,10 +23,9 @@ def rand_mat(rows: int, cols: int, logmod: int) -> np.ndarray:
 
 
 def shake_rand_mat(rows: int, cols: int, logmod: int, key: bytes) -> np.ndarray:
-    high = 1 << logmod
     xof = hashlib.shake_256(key)
     buf = xof.digest(rows * cols * 4)
-    arr = np.frombuffer(buf, dtype='<u4').reshape(rows, cols)
+    arr = np.frombuffer(buf, dtype="<u4").reshape(rows, cols)
     mask = np.uint32((1 << logmod) - 1)
     return arr & mask
 
@@ -81,21 +80,6 @@ def contract(x: np.ndarray, mod: int, delta: int) -> np.ndarray:
         grouped_digits * multipliers[np.newaxis, :, np.newaxis], axis=1
     )
     return reconstructed
-
-
-def transpose_and_expand_and_concat_cols_and_squish(
-    x: np.ndarray, mod: int, delta: int, concat: int, basis: int, d: int
-) -> np.ndarray:
-    if x.shape[0] % concat != 0:
-        raise ValueError("x must be a multiple of concat.")
-    x_T = x.T
-    x_expanded = expand(x_T, mod, delta)
-    exp_rows, exp_cols = x_expanded.shape
-    grouped_cols = x_expanded.reshape(exp_rows, exp_cols // concat, concat)
-    transposed_groups = grouped_cols.transpose(2, 0, 1)
-    x_concatenated = transposed_groups.reshape(exp_rows * concat, exp_cols // concat)
-    final_result = squish(x_concatenated, basis, d)
-    return final_result
 
 
 def matrix_mul_vec_packed(

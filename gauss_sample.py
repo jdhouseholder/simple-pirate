@@ -1,4 +1,4 @@
-import random
+import secrets
 
 _CDF_TABLE = [
     0.5,
@@ -139,18 +139,21 @@ sampler included in his dgs library:
     https://github.com/malb/dgs
 """
 
+# Let's just use the os crypto randomness for simplicity.
+_sysrand = secrets.SystemRandom()
+
 
 def gauss_sample() -> int:
     x = 0
     y = 0.0
     while True:
-        x = random.randrange(len(_CDF_TABLE))
-        y = random.random()
+        x = secrets.randbelow(len(_CDF_TABLE))
+        y = _sysrand.random()
 
         if y < _CDF_TABLE[x]:
             break
 
-    if bool(random.getrandbits(1)):
+    if bool(_sysrand.getrandbits(1)):
         x = -x
 
     return x

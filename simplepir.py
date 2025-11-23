@@ -27,32 +27,36 @@ def process_database(parameters: Parameters, og_db: np.ndarray):
         at = np.uint64(0)
         cur = np.uint64(0)
         coeff = np.uint64(1)
-        for i, v in enumerate(og_db):
+        for v_index, v in enumerate(og_db):
             cur += v * coeff
             coeff *= np.uint64(1 << parameters.bits_per_entry)
-            if ((i + 1) % parameters.num_db_entries_per_zp_element == 0) or (
-                i == len(og_db) - 1
+            if ((v_index + 1) % parameters.num_db_entries_per_zp_element == 0) or (
+                v_index == len(og_db) - 1
             ):
-                i = at // parameters.db_cols
-                j = at % parameters.db_cols
-
-                db[i, j] = cur
+                db[
+                    at // parameters.db_cols,
+                    at % parameters.db_cols,
+                ] = cur
 
                 at += 1
-                cur = 0
-                coeff = 1
+                cur = np.uint64(0)
+                coeff = np.uint64(1)
     else:
         # Multiple zp elements per db entry
-        for i, v in enumerate(og_db):
-            for j in range(parameters.num_zp_elements_per_db_entry):
-                k = (
-                    np.uint64(i) // parameters.db_cols
-                ) * parameters.num_zp_elements_per_db_entry + j
-                l = np.uint64(i) % parameters.db_cols
-                db[k, l] = lib.base_p(
+
+        # Each entry needs to be split across zp elements, so we'll have to calculate the number of bits
+        # per zp and then split.
+        for v_index, v in enumerate(og_db):
+            for zp_element_index in range(parameters.num_zp_elements_per_db_entry):
+                i = (
+                    v_index // parameters.db_cols
+                ) * parameters.num_zp_elements_per_db_entry + zp_element_index
+                j = v_index % parameters.db_cols
+
+                db[i, j] = lib.base_p(
                     p=parameters.plaintext_modulus,
                     m=v,
-                    i=j,
+                    i=zp_element_index,
                 )
     return db
 
@@ -142,9 +146,9 @@ class SimplePirClient:
             self.parameters.lwe_secret_dimension, 1, self.parameters.logq
         )
         err = lib.gauss_mat(self.parameters.db_cols, 1)
-        t = self.A @ secret
-        query = np.empty_like(t, dtype=np.uint32)
-        np.add(t, err, out=query, casting="unsafe")
+        ax = self.A @ secret
+        query = np.empty_like(ax, dtype=np.uint32)
+        np.add(ax, err, out=query, casting="unsafe")
 
         query[index % self.parameters.db_cols] += self.parameters.delta
 
@@ -163,34 +167,37 @@ class SimplePirClient:
 
     def recover(self, query_state: QueryState, answer: np.ndarray):
         ratio = np.uint64(self.parameters.plaintext_modulus // 2)
-        offset = np.uint64(0)
+        off = np.uint64(0)
         for i in range(self.parameters.db_cols):
             q = query_state.query[i][0].astype(np.uint64)
-            offset += ratio * q
+            off += ratio * q
         q = np.uint64(1 << self.parameters.logq)
-        offset %= q
-        offset = q - offset
+        off %= q
+
+        # offset = q - offset
+        offset = np.empty_like(off, dtype=np.uint32)
+        np.subtract(q, off, out=offset, casting="unsafe")
 
         row = query_state.index // self.parameters.db_cols
 
         tmp = self.hint @ query_state.secret
 
-        answer -= tmp
+        # decryption_base = answer - tmp
+        decryption_base = np.empty_like(answer, dtype=np.uint32)
+        np.subtract(answer, tmp, out=decryption_base, casting="unsafe")
 
         vals = []
         for i in range(
             row * self.parameters.num_zp_elements_per_db_entry,
             (row + 1) * self.parameters.num_zp_elements_per_db_entry,
         ):
-            noised = answer[i].astype(np.uint64) + offset
+            noised = decryption_base[i].astype(np.uint64) + offset
             denoised = lib.round(
                 noised,
                 delta=self.parameters.delta,
                 plaintext_modulus=self.parameters.plaintext_modulus,
             )
             vals.append(denoised[0])
-
-        answer += tmp
 
         return lib.reconstruct_elem(
             vals,
@@ -200,19 +207,30 @@ class SimplePirClient:
 
 
 if __name__ == "__main__":
-    # TODO: There is a type error somewhere when we have very high number of
-    # entries the recovery is off by 1.
-    num_entries = 100_000
-    db = np.random.randint(0, 256, size=(num_entries,), dtype=np.uint32)
+    import pprint
 
-    parameters = configuration_solver.solve_system_parameters(
-        num_entries=num_entries,
-        bits_per_entry=8,
-        lwe_secret_dimension=1024,
-        logq=32,
+    # num_entries = 536870912  # 67108864 #16_777_216 #1_048_576
+    # num_entries = 16_777_216
+    num_entries = 1_048_576
+
+    # bits_per_entry = 8
+    bits_per_entry = 32
+    db = (
+        np.random.randint(0, 1 << bits_per_entry, size=(num_entries,), dtype=np.uint32)
+        % bits_per_entry
     )
 
+    print(f"Solving for parameters for database with {num_entries} entries")
+    parameters = configuration_solver.solve_system_parameters(
+        num_entries=num_entries,
+        bits_per_entry=bits_per_entry,
+    )
+    print("Found parameters")
+    pprint.pp(parameters)
+
+    print("Setting up server")
     server = SimplePirServer(parameters, db)
+    print("Setup server")
 
     offline_data = server.get_offline_data()
 
@@ -221,6 +239,7 @@ if __name__ == "__main__":
         offline_data,
     )
 
+    print("Starting test")
     for index in range(num_entries):
         want = int(db[index] % parameters.plaintext_modulus)
 
@@ -229,6 +248,10 @@ if __name__ == "__main__":
         got = client.recover(state, answer[0])
 
         assert got == want, f"{index}: {got} != {want}"
-        if index % 1000 == 0:
+
+        if num_entries > 1_048_576:
+            print(f"{index}: valid")
+
+        if index > 0 and index % 100 == 0:
             print(f"Completed up to {index}")
     print("Done")
