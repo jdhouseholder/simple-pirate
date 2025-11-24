@@ -99,6 +99,10 @@ class SimplePirServer:
         return OfflineData(A_key=self.A_key, hint=self.hint)
 
     def answer(self, queries: List[np.ndarray]):
+        # The client knows the indicies that it is querying so it can
+        # send multiple disjoint queries according to this uniform split
+        # policy and get batching for free.
+
         n_queries = len(queries)
         rows = self.db.shape[0]
         batch_size = rows // n_queries
@@ -209,6 +213,19 @@ class SimplePirClient:
 if __name__ == "__main__":
     import pprint
 
+    def pack_ascii_to_u32(s: str) -> int:
+        b = s.encode("ascii")
+        if len(b) > 4:
+            raise ValueError("ASCII string must be <= 4 bytes.")
+        return int.from_bytes(b + b"\x00" * (4 - len(b)), "little")
+
+    def unpack_u32_to_ascii(u32: int) -> str:
+        u32 = int(u32)
+        if not (0 <= u32 <= 0xFFFFFFFF):
+            raise ValueError("Value must be a uint32.")
+        b = u32.to_bytes(4, "little").rstrip(b"\x00")
+        return b.decode("ascii")
+
     # num_entries = 536870912  # 67108864 #16_777_216 #1_048_576
     # num_entries = 16_777_216
     num_entries = 1_048_576
@@ -216,9 +233,10 @@ if __name__ == "__main__":
     # bits_per_entry = 8
     bits_per_entry = 32
     db = (
-        np.random.randint(0, 1 << bits_per_entry, size=(num_entries,), dtype=np.uint32)
+        np.random.randint(0, 1 << bits_per_entry, size=(num_entries,), dtype=np.uint64)
         % bits_per_entry
     )
+    db[1337] = pack_ascii_to_u32("HI!")
 
     print(f"Solving for parameters for database with {num_entries} entries")
     parameters = configuration_solver.solve_system_parameters(
@@ -240,6 +258,14 @@ if __name__ == "__main__":
     )
 
     print("Starting test")
+
+    state, query = client.query(1337)
+    answer = server.answer([query])
+    got = client.recover(state, answer[0])
+    got = unpack_u32_to_ascii(got)
+    assert got == "HI!", f'got={got}, want="HI!"'
+    print('Got "HI!"')
+
     for index in range(num_entries):
         want = int(db[index] % parameters.plaintext_modulus)
 
