@@ -1,4 +1,7 @@
 # Simple PIRate 🏴‍☠️🏝️💰
+
+*Arrrggg, I can't tell what ye be looking for*
+
 Simple pir in python implemented with numpy!
 
 Based on *One Server for the Price of Two: Simple and Fast Single-Server Private Information Retrieval*
