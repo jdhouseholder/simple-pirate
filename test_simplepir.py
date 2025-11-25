@@ -4,7 +4,8 @@ import numpy as np
 from parameters import solve_system_parameters
 import simplepir
 
-NUM_ENTRIES = 1000
+SMALL_NUM_ENTRIES = 1_000
+LARGE_NUM_ENTRIES = 1_000_000
 
 
 def rand_db(entries, bits_per_entry):
@@ -44,9 +45,7 @@ def setup_server_and_client(entries, bits_per_entry):
 
 
 def _test_small_records(entries, bits_per_entry):
-    db, parameters, server, client = setup_server_and_client(
-        entries, bits_per_entry
-    )
+    db, parameters, server, client = setup_server_and_client(entries, bits_per_entry)
 
     for index in range(entries):
         want = db[index]
@@ -79,20 +78,53 @@ def _test_large_records(entries, bits_per_entry):
 
 
 def test_1_bit_entries():
-    _test_small_records(entries=NUM_ENTRIES, bits_per_entry=1)
+    _test_small_records(entries=SMALL_NUM_ENTRIES, bits_per_entry=1)
+
+
+def test_3_bit_entries():
+    _test_small_records(entries=SMALL_NUM_ENTRIES, bits_per_entry=3)
 
 
 def test_8_bit_entries():
-    _test_small_records(entries=NUM_ENTRIES, bits_per_entry=8)
+    _test_small_records(entries=SMALL_NUM_ENTRIES, bits_per_entry=8)
 
 
 def test_32_bit_entries():
-    _test_small_records(entries=NUM_ENTRIES, bits_per_entry=32)
+    _test_small_records(entries=SMALL_NUM_ENTRIES, bits_per_entry=32)
+
+
+def test_33_bit_entries():
+    _test_small_records(entries=SMALL_NUM_ENTRIES, bits_per_entry=33)
 
 
 def test_64_bit_entries():
-    _test_small_records(entries=NUM_ENTRIES, bits_per_entry=64)
+    _test_small_records(entries=SMALL_NUM_ENTRIES, bits_per_entry=64)
 
 
 def test_512_bit_entries():
-    _test_large_records(entries=NUM_ENTRIES, bits_per_entry=512)
+    _test_large_records(entries=SMALL_NUM_ENTRIES, bits_per_entry=512)
+
+
+@pytest.mark.slow
+def test_1_bit_entries_large_db():
+    _test_small_records(entries=LARGE_NUM_ENTRIES, bits_per_entry=1)
+
+
+@pytest.mark.slow
+def test_8_bit_entries_large_db():
+    _test_small_records(entries=LARGE_NUM_ENTRIES, bits_per_entry=8)
+
+
+@pytest.mark.slow
+def test_32_bit_entries_large_db():
+    _test_small_records(entries=LARGE_NUM_ENTRIES, bits_per_entry=32)
+
+
+@pytest.mark.slow
+def test_64_bit_entries_large_db():
+    _test_small_records(entries=LARGE_NUM_ENTRIES, bits_per_entry=64)
+
+
+@pytest.mark.slow
+def test_512_bit_entries_large_db():
+    _test_large_records(entries=LARGE_NUM_ENTRIES, bits_per_entry=512)

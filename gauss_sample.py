@@ -134,9 +134,11 @@ _CDF_TABLE = [
 
 
 """
-The function below is modeled on Martin Albrecht's discrete-Gaussian
-sampler included in his dgs library: 
+This function is based on 
+    https://github.com/ahenzinger/simplepir/blob/main/pir/gauss.go
+that is based on
     https://github.com/malb/dgs
+from Martin Albrecht's discrete-Gaussian sampler included in his dgs library.
 """
 
 # Let's just use the os crypto randomness for simplicity.

@@ -35,8 +35,8 @@ class Parameters:
 class ElementConfig:
     zp_elements: int
     zp_elements_per_db_entry: int
-    zp_elements_per_logical_entry: int
     db_entries_per_zp_element: int
+    zp_elements_per_logical_entry: int
 
 
 def compute_required_zp_elements(
@@ -52,31 +52,27 @@ def compute_required_zp_elements(
         return ElementConfig(
             zp_elements=zp_elements,
             zp_elements_per_db_entry=np.uint64(1),
-            zp_elements_per_logical_entry=np.uint64(1),
             db_entries_per_zp_element=np.uint64(entries_per_element),
+            zp_elements_per_logical_entry=np.uint64(1),
         )
     else:
         # Split one db entry across multiple Zp elements.
 
         zp_elements_per_db_entry = int(math.ceil(bits_per_entry / logp))
-        zp_elements = (
-            entries
-            * zp_elements_per_db_entry
-            * db_entries_per_logical_entry
-        )
+        zp_elements = entries * zp_elements_per_db_entry * db_entries_per_logical_entry
         zp_elements_per_logical_entry = (
             zp_elements_per_db_entry * db_entries_per_logical_entry
         )
         return ElementConfig(
             zp_elements=zp_elements,
             zp_elements_per_db_entry=zp_elements_per_db_entry,
-            zp_elements_per_logical_entry=zp_elements_per_logical_entry,
             db_entries_per_zp_element=np.uint64(0),
+            zp_elements_per_logical_entry=zp_elements_per_logical_entry,
         )
 
 
 def compute_database_shape(element_config):
-    rows = np.uint64(math.floor(math.sqrt(element_config.zp_elements)))
+    rows = np.uint64(math.floor(math.sqrt(float(element_config.zp_elements))))
 
     rem = rows % element_config.zp_elements_per_logical_entry
     if rem != 0:
@@ -131,9 +127,7 @@ def solve_system_parameters(
                 lwe_secret_dimension=np.uint64(lwe_secret_dimension),
                 entries=np.uint64(entries),
                 bits_per_entry=np.uint64(bits_per_entry),
-                db_entries_per_logical_entry=np.uint64(
-                    db_entries_per_logical_entry
-                ),
+                db_entries_per_logical_entry=np.uint64(db_entries_per_logical_entry),
                 db_rows=np.uint64(rows),
                 db_cols=np.uint64(cols),
                 logq=np.uint64(logq),

@@ -13,7 +13,7 @@ class OfflineData:
 
 
 def process_database(parameters: Parameters, og_db: np.ndarray):
-    db = np.empty(
+    db = np.zeros(
         (
             parameters.db_rows,
             parameters.db_cols,
@@ -40,7 +40,7 @@ def process_database(parameters: Parameters, og_db: np.ndarray):
                 at += 1
                 cur = np.uint64(0)
                 coeff = np.uint64(1)
-    else:
+    elif parameters.db_entries_per_logical_entry == 1:
         # Multiple zp elements per db entry
 
         # Each entry needs to be split across zp elements, so we'll have to calculate the number of bits
@@ -57,6 +57,27 @@ def process_database(parameters: Parameters, og_db: np.ndarray):
                     i=zp_element_index,
                     p=parameters.plaintext_modulus,
                 )
+    else:
+        for logical_index, logical_chunk in enumerate(
+            lib.chunk(og_db, n=parameters.db_entries_per_logical_entry)
+        ):
+            for db_entry_index, db_entry in enumerate(logical_chunk):
+                for zp_element_index in range(parameters.zp_elements_per_db_entry):
+                    i = (
+                        (logical_index // parameters.db_cols)
+                        * parameters.zp_elements_per_db_entry
+                        * parameters.db_entries_per_logical_entry
+                        + parameters.zp_elements_per_db_entry * db_entry_index
+                        + zp_element_index
+                    )
+                    j = logical_index % parameters.db_cols
+
+                    db[i, j] = lib.base_p(
+                        m=db_entry,
+                        i=zp_element_index,
+                        p=parameters.plaintext_modulus,
+                    )
+
     return db
 
 
@@ -128,6 +149,7 @@ class SimplePirServer:
 @dataclass
 class QueryState:
     index: int
+    effective_index: int
     query: np.ndarray
     secret: np.ndarray
 
@@ -153,7 +175,12 @@ class SimplePirClient:
         query = np.empty_like(ax, dtype=np.uint32)
         np.add(ax, err, out=query, casting="unsafe")
 
-        query[index % self.parameters.db_cols] += self.parameters.delta
+        if self.parameters.db_entries_per_zp_element > 0:
+            effective_index = index // self.parameters.db_entries_per_zp_element
+        else:
+            effective_index = index
+
+        query[effective_index % self.parameters.db_cols] += self.parameters.delta
 
         if self.parameters.db_cols % self.parameters.compression_squishing != 0:
             padding_size = self.parameters.compression_squishing - (
@@ -166,7 +193,9 @@ class SimplePirClient:
                 ]
             )
 
-        return QueryState(index=index, query=query, secret=secret), query
+        return QueryState(
+            index=index, effective_index=effective_index, query=query, secret=secret
+        ), query
 
     def recover(self, query_state: QueryState, answer: np.ndarray):
         ratio = np.uint64(self.parameters.plaintext_modulus // 2)
@@ -181,13 +210,15 @@ class SimplePirClient:
         offset = np.empty_like(off, dtype=np.uint32)
         np.subtract(q, off, out=offset, casting="unsafe")
 
-        row = query_state.index // self.parameters.db_cols
+        row = query_state.effective_index // self.parameters.db_cols
 
         tmp = (self.hint @ query_state.secret).astype(np.uint32)
 
         # decryption_base = answer - tmp
         decryption_base = np.empty_like(answer, dtype=np.uint32)
         np.subtract(answer, tmp, out=decryption_base, casting="unsafe")
+
+        pd2 = np.uint64(self.parameters.plaintext_modulus // 2)
 
         vals = []
         for i in range(
@@ -200,13 +231,16 @@ class SimplePirClient:
                 delta=self.parameters.delta,
                 plaintext_modulus=self.parameters.plaintext_modulus,
             )
-            vals.append(denoised[0])
+            tmp = ((denoised + pd2) % q) % self.parameters.plaintext_modulus
+            vals.append(tmp)
 
-        return lib.reconstruct_elem(
+        elem = lib.reconstruct_elem(
             vals,
             query_state.index,
             self.parameters,
         )
+
+        return elem[0]
 
     def recover_large_record(self, query_state: QueryState, answer: np.ndarray):
         ratio = np.uint64(self.parameters.plaintext_modulus // 2)
@@ -221,94 +255,40 @@ class SimplePirClient:
         offset = np.empty_like(off, dtype=np.uint32)
         np.subtract(q, off, out=offset, casting="unsafe")
 
-        tmp = self.hint @ query_state.secret
+        logical_row = query_state.effective_index // self.parameters.db_cols
+
+        tmp = (self.hint @ query_state.secret).astype(np.uint32)
 
         # decryption_base = answer - tmp
         decryption_base = np.empty_like(answer, dtype=np.uint32)
         np.subtract(answer, tmp, out=decryption_base, casting="unsafe")
 
-        logical_row = query_state.index // self.parameters.db_cols
+        pd2 = np.uint64(self.parameters.plaintext_modulus // 2)
 
-        elements = []
+        db_entries = []
         for i in range(self.parameters.db_entries_per_logical_entry):
             vals = []
-            entry_start = logical_row + (
-                i * self.parameters.zp_elements_per_db_entry
-            )
-            entry_end = logical_row + (
-                (i + 1) * self.parameters.zp_elements_per_db_entry
-            )
-            for j in range(entry_start, entry_end):
-                noised = decryption_base[j].astype(np.uint64) + offset
+            for j in range(self.parameters.zp_elements_per_db_entry):
+                index = (
+                    logical_row
+                    * self.parameters.zp_elements_per_db_entry
+                    * self.parameters.db_entries_per_logical_entry
+                    + i * self.parameters.zp_elements_per_db_entry
+                    + j
+                )
+                noised = decryption_base[index].astype(np.uint64) + offset
                 denoised = lib.round(
                     noised,
                     delta=self.parameters.delta,
                     plaintext_modulus=self.parameters.plaintext_modulus,
                 )
-                vals.append(denoised[0])
+                tmp = ((denoised + pd2) % q) % self.parameters.plaintext_modulus
+                vals.append(tmp)
 
-            elements.append(
-                lib.reconstruct_elem(
-                    vals,
-                    query_state.index,
-                    self.parameters,
-                )
+            elem = lib.reconstruct_elem(
+                vals,
+                query_state.index,
+                self.parameters,
             )
-        return elements
-
-
-if __name__ == "__main__":
-    import pprint
-
-    entries = 1024
-    bits_per_entry = 8
-
-    # Duplicate this logic for the demo
-    db_entries_per_logical_entry = 1
-    if bits_per_entry > 64:
-        assert bits_per_entry % 64 == 0
-        db_entries_per_logical_entry = bits_per_entry // 64
-        high = 1 << 64
-    else:
-        high = 1 << bits_per_entry
-    db = np.random.randint(
-        0,
-        high,
-        size=(entries * db_entries_per_logical_entry,),
-        dtype=np.uint64,
-    )
-
-    print(f"Solving for parameters for database with {entries} entries")
-    parameters = solve_system_parameters(
-        entries=entries,
-        bits_per_entry=bits_per_entry,
-    )
-    print("Found parameters")
-    pprint.pp(parameters)
-
-    print("Setting up server")
-    server = SimplePirServer(parameters, db)
-    print("Setup server")
-
-    offline_data = server.get_offline_data()
-
-    client = SimplePirClient(
-        parameters,
-        offline_data,
-    )
-
-    print("Starting test")
-
-    for index in range(entries):
-        want = db[index]
-
-        state, query = client.query(index)
-        answer = server.answer([query])
-        got = client.recover(state, answer[0])
-
-        assert got == want, f"{index}: {got} != {want}"
-
-        if index > 0 and index % 100 == 0:
-            print(f"Completed up to {index}")
-
-    print("Done")
+            db_entries.append(elem[0])
+        return db_entries
