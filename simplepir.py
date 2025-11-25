@@ -21,7 +21,7 @@ def process_database(parameters: Parameters, og_db: np.ndarray):
         dtype=np.uint32,
     )
 
-    if parameters.num_db_entries_per_zp_element > 0:
+    if parameters.db_entries_per_zp_element > 0:
         # Multiple db entries per zp element
         at = np.uint64(0)
         cur = np.uint64(0)
@@ -29,7 +29,7 @@ def process_database(parameters: Parameters, og_db: np.ndarray):
         for v_index, v in enumerate(og_db):
             cur += v * coeff
             coeff *= np.uint64(1 << parameters.bits_per_entry)
-            if ((v_index + 1) % parameters.num_db_entries_per_zp_element == 0) or (
+            if ((v_index + 1) % parameters.db_entries_per_zp_element == 0) or (
                 v_index == len(og_db) - 1
             ):
                 db[
@@ -46,10 +46,10 @@ def process_database(parameters: Parameters, og_db: np.ndarray):
         # Each entry needs to be split across zp elements, so we'll have to calculate the number of bits
         # per zp and then split.
         for v_index, v in enumerate(og_db):
-            for zp_element_index in range(parameters.num_zp_elements_per_db_entry):
+            for zp_element_index in range(parameters.zp_elements_per_db_entry):
                 i = (
                     v_index // parameters.db_cols
-                ) * parameters.num_zp_elements_per_db_entry + zp_element_index
+                ) * parameters.zp_elements_per_db_entry + zp_element_index
                 j = v_index % parameters.db_cols
 
                 db[i, j] = lib.base_p(
@@ -191,8 +191,8 @@ class SimplePirClient:
 
         vals = []
         for i in range(
-            row * self.parameters.num_zp_elements_per_db_entry,
-            (row + 1) * self.parameters.num_zp_elements_per_db_entry,
+            row * self.parameters.zp_elements_per_db_entry,
+            (row + 1) * self.parameters.zp_elements_per_db_entry,
         ):
             noised = decryption_base[i].astype(np.uint64) + offset
             denoised = lib.round(
@@ -230,13 +230,13 @@ class SimplePirClient:
         logical_row = query_state.index // self.parameters.db_cols
 
         elements = []
-        for i in range(self.parameters.num_db_entries_per_logical_entry):
+        for i in range(self.parameters.db_entries_per_logical_entry):
             vals = []
             entry_start = logical_row + (
-                i * self.parameters.num_zp_elements_per_db_entry
+                i * self.parameters.zp_elements_per_db_entry
             )
             entry_end = logical_row + (
-                (i + 1) * self.parameters.num_zp_elements_per_db_entry
+                (i + 1) * self.parameters.zp_elements_per_db_entry
             )
             for j in range(entry_start, entry_end):
                 noised = decryption_base[j].astype(np.uint64) + offset
@@ -260,27 +260,27 @@ class SimplePirClient:
 if __name__ == "__main__":
     import pprint
 
-    num_entries = 1024
+    entries = 1024
     bits_per_entry = 8
 
     # Duplicate this logic for the demo
-    num_db_entries_per_logical_entry = 1
+    db_entries_per_logical_entry = 1
     if bits_per_entry > 64:
         assert bits_per_entry % 64 == 0
-        num_db_entries_per_logical_entry = bits_per_entry // 64
+        db_entries_per_logical_entry = bits_per_entry // 64
         high = 1 << 64
     else:
         high = 1 << bits_per_entry
     db = np.random.randint(
         0,
         high,
-        size=(num_entries * num_db_entries_per_logical_entry,),
+        size=(entries * db_entries_per_logical_entry,),
         dtype=np.uint64,
     )
 
-    print(f"Solving for parameters for database with {num_entries} entries")
+    print(f"Solving for parameters for database with {entries} entries")
     parameters = solve_system_parameters(
-        num_entries=num_entries,
+        entries=entries,
         bits_per_entry=bits_per_entry,
     )
     print("Found parameters")
@@ -299,7 +299,7 @@ if __name__ == "__main__":
 
     print("Starting test")
 
-    for index in range(num_entries):
+    for index in range(entries):
         want = db[index]
 
         state, query = client.query(index)

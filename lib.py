@@ -124,10 +124,10 @@ def reconstruct_elem(vals, index, parameters):
 
     val = reconstruct_from_base_p(vals, parameters.plaintext_modulus)
 
-    if parameters.num_db_entries_per_zp_element > 0:
+    if parameters.db_entries_per_zp_element > 0:
         return base_p(
             m=val,
-            i=np.uint64(index % parameters.num_db_entries_per_zp_element),
+            i=np.uint64(index % parameters.db_entries_per_zp_element),
             p=np.uint64(1 << parameters.bits_per_entry),
         )
     else:
