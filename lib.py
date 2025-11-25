@@ -107,8 +107,8 @@ def base_p(p, m, i):
 
 
 def reconstruct_from_base_p(vals, p):
-    res = 0
-    coeff = 1
+    res = np.uint64(0)
+    coeff = np.uint64(1)
     for v in vals:
         res += coeff * v
         coeff *= p

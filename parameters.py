@@ -19,6 +19,7 @@ class Parameters:
 
     num_db_entries_per_zp_element: int  # if log(p) > bits_per_entry
     num_zp_elements_per_db_entry: int  # if bits_per_entry > log(p)
+    num_db_entries_per_logical_entry: int
 
     communication_x: int
 

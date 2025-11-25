@@ -13,6 +13,10 @@ class OfflineData:
     hint: np.ndarray
 
 
+def chunk(a, n=1):
+    return [a[i : i + n] for i in range(0, a.shape[0], n)]
+
+
 def process_database(parameters: Parameters, og_db: np.ndarray):
     db = np.empty(
         (
@@ -46,18 +50,25 @@ def process_database(parameters: Parameters, og_db: np.ndarray):
 
         # Each entry needs to be split across zp elements, so we'll have to calculate the number of bits
         # per zp and then split.
-        for v_index, v in enumerate(og_db):
-            for zp_element_index in range(parameters.num_zp_elements_per_db_entry):
-                i = (
-                    v_index // parameters.db_cols
-                ) * parameters.num_zp_elements_per_db_entry + zp_element_index
-                j = v_index % parameters.db_cols
+        for logical_index, v_chunk in enumerate(
+            chunk(og_db, parameters.num_db_entries_per_logical_entry)
+        ):
+            for v_index, v in enumerate(v_chunk):
+                for zp_element_index in range(parameters.num_zp_elements_per_db_entry):
+                    i = (
+                        (logical_index // parameters.db_cols)
+                        * parameters.num_zp_elements_per_db_entry
+                        * parameters.num_db_entries_per_logical_entry
+                        + v_index * parameters.num_zp_elements_per_db_entry
+                        + zp_element_index
+                    )
+                    j = logical_index % parameters.db_cols
 
-                db[i, j] = lib.base_p(
-                    p=parameters.plaintext_modulus,
-                    m=v,
-                    i=zp_element_index,
-                )
+                    db[i, j] = lib.base_p(
+                        p=parameters.plaintext_modulus,
+                        m=v,
+                        i=zp_element_index,
+                    )
     return db
 
 
@@ -209,19 +220,66 @@ class SimplePirClient:
             self.parameters,
         )
 
+    def recover_large_record(self, query_state: QueryState, answer: np.ndarray):
+        ratio = np.uint64(self.parameters.plaintext_modulus // 2)
+        off = np.uint64(0)
+        for i in range(self.parameters.db_cols):
+            query_at_i = query_state.query[i][0].astype(np.uint64)
+            off += ratio * query_at_i
+        q = np.uint64(1 << self.parameters.logq)
+        off %= q
+
+        # offset = q - offset
+        offset = np.empty_like(off, dtype=np.uint32)
+        np.subtract(q, off, out=offset, casting="unsafe")
+
+        tmp = self.hint @ query_state.secret
+
+        # decryption_base = answer - tmp
+        decryption_base = np.empty_like(answer, dtype=np.uint32)
+        np.subtract(answer, tmp, out=decryption_base, casting="unsafe")
+
+        row = query_state.index // self.parameters.db_cols
+
+        elements = []
+        for i in range(self.parameters.num_db_entries_per_logical_entry):
+            vals = []
+            for j in range(
+                (row + i) * self.parameters.num_zp_elements_per_db_entry,
+                (row + i + 1) * self.parameters.num_zp_elements_per_db_entry,
+            ):
+                noised = decryption_base[j].astype(np.uint64) + offset
+                denoised = lib.round(
+                    noised,
+                    delta=self.parameters.delta,
+                    plaintext_modulus=self.parameters.plaintext_modulus,
+                )
+                vals.append(denoised[0])
+
+            elements.append(
+                lib.reconstruct_elem(
+                    vals,
+                    query_state.index,
+                    self.parameters,
+                )
+            )
+        return elements
+
 
 if __name__ == "__main__":
     import pprint
 
-    # num_entries = 536870912  # 67108864 #16_777_216 #1_048_576
-    # num_entries = 16_777_216
-    num_entries = 1_048_576
+    num_entries = 8192
+    bits_per_entry = 1
+    num_db_entries_per_logical_entry = 1
 
-    # bits_per_entry = 8
-    bits_per_entry = 32
     db = (
-        np.random.randint(0, 1 << bits_per_entry, size=(num_entries,), dtype=np.uint64)
-        % bits_per_entry
+        np.random.randint(
+            0,
+            1 << bits_per_entry,
+            size=(num_entries * num_db_entries_per_logical_entry,),
+            dtype=np.uint64,
+        )
     )
 
     print(f"Solving for parameters for database with {num_entries} entries")
