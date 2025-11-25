@@ -100,7 +100,7 @@ def round(x, delta, plaintext_modulus):
     return v % plaintext_modulus
 
 
-def base_p(p, m, i):
+def base_p(m, i, p):
     for j in range(i):
         m = m // p
     return m % p
@@ -116,8 +116,8 @@ def reconstruct_from_base_p(vals, p):
 
 
 def reconstruct_elem(vals, index, parameters):
-    q = 1 << parameters.logq
-    pd2 = parameters.plaintext_modulus // 2
+    q = np.uint64(1 << parameters.logq)
+    pd2 = np.uint64(parameters.plaintext_modulus // 2)
     for i in range(len(vals)):
         tmp = (vals[i] + pd2) % q
         vals[i] = tmp % parameters.plaintext_modulus
@@ -125,10 +125,10 @@ def reconstruct_elem(vals, index, parameters):
     val = reconstruct_from_base_p(vals, parameters.plaintext_modulus)
 
     if parameters.num_db_entries_per_zp_element > 0:
-        val = base_p(
-            1 << parameters.bits_per_entry,
-            val,
-            index % parameters.num_db_entries_per_zp_element,
+        return base_p(
+            m=val,
+            i=np.uint64(index % parameters.num_db_entries_per_zp_element),
+            p=np.uint64(1 << parameters.bits_per_entry),
         )
-
-    return val
+    else:
+        return val
