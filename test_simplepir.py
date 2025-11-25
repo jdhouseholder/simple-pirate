@@ -8,15 +8,18 @@ NUM_ENTRIES = 1000
 
 
 def rand_db(num_entries, bits_per_entry):
-    num_db_entries_per_logical_entry = 1
     if bits_per_entry > 64:
         assert bits_per_entry % 64 == 0
         num_db_entries_per_logical_entry = bits_per_entry // 64
         high = 1 << 64
     else:
+        num_db_entries_per_logical_entry = 1
         high = 1 << bits_per_entry
     return np.random.randint(
-        0, high, size=(num_entries * num_db_entries_per_logical_entry,), dtype=np.uint64
+        0,
+        high,
+        size=(num_entries * num_db_entries_per_logical_entry,),
+        dtype=np.uint64,
     )
 
 

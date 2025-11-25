@@ -40,12 +40,13 @@ class ElementConfig:
 
 
 def compute_required_zp_elements(
-    num_entries, bits_per_entry, num_db_entries_per_logical_entry, modulus
+    num_entries, bits_per_entry, num_db_entries_per_logical_entry, mod_p
 ):
-    logp = math.log2(modulus)
+    logp = math.log2(mod_p)
     if bits_per_entry <= logp:
-        assert num_db_entries_per_logical_entry == 1
         # Pack multipe db entries into one Zp element.
+
+        assert num_db_entries_per_logical_entry == 1
         entries_per_element = math.floor(logp / bits_per_entry)
         num_zp_elements = np.uint64(math.ceil(num_entries / entries_per_element))
         return ElementConfig(
@@ -56,6 +57,7 @@ def compute_required_zp_elements(
         )
     else:
         # Split one db entry across multiple Zp elements.
+
         num_zp_elements_per_db_entry = int(math.ceil(bits_per_entry / logp))
         num_zp_elements = (
             num_entries
@@ -73,7 +75,7 @@ def compute_required_zp_elements(
         )
 
 
-def compute_database_shape(num_entries, bits_per_entry, element_config):
+def compute_database_shape(element_config):
     rows = np.uint64(math.floor(math.sqrt(element_config.num_zp_elements)))
 
     rem = rows % element_config.num_zp_elements_per_logical_entry
@@ -122,7 +124,7 @@ def solve_system_parameters(
         element_config = compute_required_zp_elements(
             num_entries, bits_per_entry, num_db_entries_per_logical_entry, mod_p
         )
-        rows, cols = compute_database_shape(num_entries, bits_per_entry, element_config)
+        rows, cols = compute_database_shape(element_config)
         sigma, plaintext_modulus = pick_parameters(lwe_secret_dimension, logq, mod_p)
         if plaintext_modulus < mod_p:
             return Parameters(
