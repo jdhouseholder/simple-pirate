@@ -4,6 +4,7 @@ import numpy as np
 
 from parameters import Parameters, solve_system_parameters
 import lib
+import supa_fast
 
 
 @dataclass
@@ -82,7 +83,7 @@ def process_database(parameters: Parameters, og_db: np.ndarray):
 
 
 class SimplePirServer:
-    def __init__(self, parameters: Parameters, db: np.ndarray):
+    def __init__(self, parameters: Parameters, db: np.ndarray, use_numba=True):
         self.parameters = parameters
 
         self.A_key = lib.random_key()
@@ -97,7 +98,10 @@ class SimplePirServer:
 
         self.db -= parameters.plaintext_modulus // 2
 
-        self.hint = (self.db @ self.A).astype(np.uint32)
+        if not self.use_numba:
+            self.hint = (self.db @ self.A).astype(np.uint32)
+        else:
+            self.hint = supa_fast.matmul_u32_tiled(self.db, self.A)
 
         self.db += self.parameters.plaintext_modulus // 2
 
@@ -132,15 +136,22 @@ class SimplePirServer:
         for batch, query in enumerate(queries):
             if batch == n_queries - 1:
                 batch_size = rows - last
-            answer.append(
-                lib.matrix_mul_vec_packed(
+            if not self.use_numba:
+                e = lib.matrix_mul_vec_packed(
                     a=self.db[last : last + batch_size],
                     b=query,
                     plaintext_modulus=self.parameters.plaintext_modulus,
                     basis=self.parameters.compression_basis,
                     compression=self.parameters.compression_squishing,
                 ).astype(np.uint32)
-            )
+            else:
+                e = supa_fast.matvec_packed_fused(
+                    a=self.db[last : last + batch_size],
+                    b=query,
+                    basis=self.parameters.compression_basis,
+                    compression=self.parameters.compression_squishing,
+                )
+            answer.append(e).astype(np.uint32)
             last += batch_size
 
         return answer

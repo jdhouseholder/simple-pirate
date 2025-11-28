@@ -24,8 +24,9 @@ def random_db(entries, bits_per_entry):
 
 
 def main():
-    entries = 1024
-    bits_per_entry = 512
+    entries = 10_000_000  # 1024
+    bits_per_entry = 64 * 34
+    n = bits_per_entry // 64
 
     db = random_db(entries, bits_per_entry)
 
@@ -51,7 +52,7 @@ def main():
     print("Starting test")
 
     for index in range(entries):
-        want = db[index * 8 : (index + 1) * 8]
+        want = db[index * n : (index + 1) * n]
 
         state, query = client.query(index)
         answer = server.answer([query])
@@ -59,7 +60,7 @@ def main():
 
         assert np.all(got == want), f"{index}: {got} != {want}"
 
-        if index > 0 and index % 100 == 0:
+        if index > 0 and index % 10 == 0:
             print(f"Completed up to {index}")
 
     print("Done")

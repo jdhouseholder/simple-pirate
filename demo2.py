@@ -7,16 +7,16 @@ from parameters import solve_system_parameters
 from serde import str_to_uint64_list, uint64_list_to_str
 
 strings = [
-        "wow",
-        "hey",
-        "cryptography",
-        "yhpargotpyrc",
-        "private information retreival",
-        "is cool",
-        "is lame",
-        "does it work?",
-        "im not really sure",
-        "can you really learn with errors, idk",
+    "wow",
+    "hey",
+    "cryptography",
+    "yhpargotpyrc",
+    "private information retreival",
+    "is cool",
+    "is lame",
+    "does it work?",
+    "im not really sure",
+    "can you really learn with errors, idk",
 ]
 
 
@@ -26,7 +26,7 @@ def main():
 
     db = []
     for s in strings:
-        db.extend(str_to_uint64_list(s, N=bits_per_entry//8))
+        db.extend(str_to_uint64_list(s, N=bits_per_entry // 8))
     db = np.asarray(db)
 
     print(f"Solving for parameters for database with {entries} entries")
