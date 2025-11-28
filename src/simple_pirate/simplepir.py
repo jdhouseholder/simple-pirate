@@ -85,6 +85,7 @@ def process_database(parameters: Parameters, og_db: np.ndarray):
 class SimplePirServer:
     def __init__(self, parameters: Parameters, db: np.ndarray, use_numba=True):
         self.parameters = parameters
+        self.use_numba = use_numba
 
         self.A_key = lib.random_key()
         self.A = lib.shake_rand_mat(
@@ -150,8 +151,8 @@ class SimplePirServer:
                     b=query,
                     basis=self.parameters.compression_basis,
                     compression=self.parameters.compression_squishing,
-                )
-            answer.append(e).astype(np.uint32)
+                ).astype(np.uint32)
+            answer.append(e)
             last += batch_size
 
         return answer
