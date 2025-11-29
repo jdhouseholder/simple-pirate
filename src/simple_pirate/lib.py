@@ -22,12 +22,25 @@ def rand_mat(rows: int, cols: int, logmod: int) -> np.ndarray:
     return arr.reshape(rows, cols)
 
 
-def shake_rand_mat(rows: int, cols: int, logmod: int, key: bytes) -> np.ndarray:
-    xof = hashlib.shake_256(key)
-    buf = xof.digest(rows * cols * 4)
-    arr = np.frombuffer(buf, dtype="<u4").reshape(rows, cols)
-    mask = np.uint32((1 << logmod) - 1)
-    return arr & mask
+def shake_rand_A_rows(
+    key: bytes, start: int, stop: int, lwe_secret_dim: int
+) -> np.ndarray:
+    out = np.empty((stop - start, lwe_secret_dim), dtype=np.uint32)
+    for j in range(stop - start):
+        xof = hashlib.shake_256(key + b'\x13\x37' + struct.pack("<I", start + j))
+        buf = xof.digest(4 * lwe_secret_dim)
+        col = np.frombuffer(buf, dtype="<u4")
+        out[j, :] = col
+    return out
+
+
+def shake_rand_mat(key: bytes, cols: int, lwe_secret_dim: int) -> np.ndarray:
+    return shake_rand_A_rows(
+        key=key,
+        start=0,
+        stop=cols,
+        lwe_secret_dim=lwe_secret_dim,
+    )
 
 
 def gauss_mat(rows: int, cols: int) -> np.ndarray:
