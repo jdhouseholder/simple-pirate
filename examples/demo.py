@@ -4,23 +4,7 @@ import numpy as np
 
 from simple_pirate import simplepir
 from simple_pirate.parameters import solve_system_parameters
-
-
-def random_db(entries, bits_per_entry):
-    # Duplicate this logic for the demo
-    db_entries_per_logical_entry = 1
-    if bits_per_entry > 64:
-        assert bits_per_entry % 64 == 0
-        db_entries_per_logical_entry = bits_per_entry // 64
-        high = 1 << 64
-    else:
-        high = 1 << bits_per_entry
-    return np.random.randint(
-        0,
-        high,
-        size=(entries * db_entries_per_logical_entry,),
-        dtype=np.uint64,
-    )
+from simple_pirate.demo_utils import random_db
 
 
 def main():
