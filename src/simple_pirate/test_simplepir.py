@@ -1,8 +1,8 @@
 import pytest
 import numpy as np
 
-from parameters import solve_system_parameters
-import simplepir
+from .parameters import solve_system_parameters
+from . import simplepir
 
 SMALL_NUM_ENTRIES = 1_000
 LARGE_NUM_ENTRIES = 1_000_000

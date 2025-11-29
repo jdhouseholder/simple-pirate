@@ -2,7 +2,7 @@ import math
 from dataclasses import dataclass
 import numpy as np
 
-from config_table import _config_table
+from .config_table import _config_table
 
 
 @dataclass

@@ -1,6 +1,6 @@
 import pytest
 
-from parameters import solve_system_parameters
+from .parameters import solve_system_parameters
 
 NUM_ENTRIES = 1_048_576
 

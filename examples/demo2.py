@@ -2,9 +2,9 @@ import pprint
 
 import numpy as np
 
-from simplepir import SimplePirServer, SimplePirClient
-from parameters import solve_system_parameters
-from serde import str_to_uint64_list, uint64_list_to_str
+from simple_pirate import simplepir
+from simple_pirate.parameters import solve_system_parameters
+from simple_pirate import serde
 
 strings = [
     "wow",
@@ -26,7 +26,7 @@ def main():
 
     db = []
     for s in strings:
-        db.extend(str_to_uint64_list(s, N=bits_per_entry // 8))
+        db.extend(serde.str_to_uint64_list(s, N=bits_per_entry // 8))
     db = np.asarray(db)
 
     print(f"Solving for parameters for database with {entries} entries")
@@ -38,12 +38,12 @@ def main():
     pprint.pp(parameters)
 
     print("Setting up server")
-    server = SimplePirServer(parameters, db)
+    server = simplepir.SimplePirServer(parameters, db)
     print("Setup server")
 
     offline_data = server.get_offline_data()
 
-    client = SimplePirClient(
+    client = simplepir.SimplePirClient(
         parameters,
         offline_data,
     )
@@ -54,7 +54,7 @@ def main():
         state, query = client.query(i)
         answer = server.answer([query])
         got = client.recover_large_record(state, answer[0])
-        got = uint64_list_to_str(got)
+        got = serde.uint64_list_to_str(got)
         assert got == want
 
     print("Done")

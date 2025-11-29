@@ -2,8 +2,8 @@ import pprint
 
 import numpy as np
 
-from simplepir import SimplePirServer, SimplePirClient
-from parameters import solve_system_parameters
+from simple_pirate import simplepir
+from simple_pirate.parameters import solve_system_parameters
 
 
 def random_db(entries, bits_per_entry):
@@ -39,12 +39,12 @@ def main():
     pprint.pp(parameters)
 
     print("Setting up server")
-    server = SimplePirServer(parameters, db)
+    server = simplepir.SimplePirServer(parameters, db)
     print("Setup server")
 
     offline_data = server.get_offline_data()
 
-    client = SimplePirClient(
+    client = simplepir.SimplePirClient(
         parameters,
         offline_data,
     )

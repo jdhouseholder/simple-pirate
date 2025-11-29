@@ -2,9 +2,9 @@ from dataclasses import dataclass
 from typing import List
 import numpy as np
 
-from parameters import Parameters, solve_system_parameters
-import lib
-import supa_fast
+from .parameters import Parameters, solve_system_parameters
+from . import lib
+from . import supa_fast
 
 
 @dataclass

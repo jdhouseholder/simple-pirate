@@ -3,7 +3,7 @@ import hashlib
 import struct
 import secrets
 
-from gauss_sample import gauss_sample
+from .gauss_sample import gauss_sample
 
 
 def random_key():
