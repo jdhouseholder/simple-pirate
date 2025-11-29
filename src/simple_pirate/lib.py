@@ -22,7 +22,7 @@ def rand_mat(rows: int, cols: int, logmod: int) -> np.ndarray:
     return arr.reshape(rows, cols)
 
 
-def shake_rand_A_rows(
+def shake_rand_rows(
     key: bytes, start: int, stop: int, lwe_secret_dim: int
 ) -> np.ndarray:
     out = np.empty((stop - start, lwe_secret_dim), dtype=np.uint32)
@@ -35,7 +35,7 @@ def shake_rand_A_rows(
 
 
 def shake_rand_mat(key: bytes, cols: int, lwe_secret_dim: int) -> np.ndarray:
-    return shake_rand_A_rows(
+    return shake_rand_rows(
         key=key,
         start=0,
         stop=cols,
