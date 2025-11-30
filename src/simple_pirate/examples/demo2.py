@@ -55,6 +55,7 @@ def main():
         answer = server.answer([query])
         got = client.recover_large_record(state, answer[0])
         got = serde.uint64_list_to_str(got)
+        got = serde.unpad_zeros(got)
         assert got == want
 
     print("Done")
