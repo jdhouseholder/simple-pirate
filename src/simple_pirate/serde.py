@@ -31,3 +31,6 @@ def uint64_list_to_bytes(values: Sequence[int]) -> bytes:
 
 def uint64_list_to_str(values: Sequence[int]) -> bytes:
     return uint64_list_to_bytes(values).decode("utf8")
+
+def mmap_to_uint64(path):
+    return np.memmap(path, dtype=np.dtype("<u8"))
