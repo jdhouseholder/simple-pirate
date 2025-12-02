@@ -121,7 +121,7 @@ def solve_system_parameters(
             entries, bits_per_entry, db_entries_per_logical_entry, mod_p
         )
         rows, cols = compute_database_shape(element_config)
-        sigma, plaintext_modulus = pick_parameters(lwe_secret_dimension, logq, mod_p)
+        sigma, plaintext_modulus = pick_parameters(lwe_secret_dimension, logq, cols)
         if plaintext_modulus < mod_p:
             return Parameters(
                 lwe_secret_dimension=np.uint64(lwe_secret_dimension),

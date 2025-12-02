@@ -63,6 +63,7 @@ def process_database(parameters: Parameters, og_db: np.ndarray):
             lib.chunk(og_db, n=parameters.db_entries_per_logical_entry)
         ):
             for db_entry_index, db_entry in enumerate(logical_chunk):
+                m = db_entry
                 for zp_element_index in range(parameters.zp_elements_per_db_entry):
                     i = (
                         (logical_index // parameters.db_cols)
@@ -72,12 +73,8 @@ def process_database(parameters: Parameters, og_db: np.ndarray):
                         + zp_element_index
                     )
                     j = logical_index % parameters.db_cols
-
-                    db[i, j] = lib.base_p(
-                        m=db_entry,
-                        i=zp_element_index,
-                        p=parameters.plaintext_modulus,
-                    )
+                    db[i, j] = m % parameters.plaintext_modulus
+                    m = m // parameters.plaintext_modulus
 
     return db
 
