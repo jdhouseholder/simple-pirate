@@ -97,7 +97,7 @@ def pick_parameters(lwe_secret_dimension, logq, samples):
             sigma = row["sigma"]
             plaintext_modulus = row["p_simple"]
             return sigma, plaintext_modulus
-    raise ValueError("Unable to find match in table")
+    return None, None
 
 
 def solve_system_parameters(
@@ -116,33 +116,39 @@ def solve_system_parameters(
         bits_per_entry = 64
 
     mod_p = 2
+    last_parameters = None
     while True:
         element_config = compute_required_zp_elements(
             entries, bits_per_entry, db_entries_per_logical_entry, mod_p
         )
         rows, cols = compute_database_shape(element_config)
         sigma, plaintext_modulus = pick_parameters(lwe_secret_dimension, logq, cols)
+        if sigma is None and plaintext_modulus is None:
+            return last_parameters
+
+        parameters = Parameters(
+            lwe_secret_dimension=np.uint64(lwe_secret_dimension),
+            entries=np.uint64(entries),
+            bits_per_entry=np.uint64(bits_per_entry),
+            db_entries_per_logical_entry=np.uint64(db_entries_per_logical_entry),
+            db_rows=np.uint64(rows),
+            db_cols=np.uint64(cols),
+            logq=np.uint64(logq),
+            plaintext_modulus=np.uint64(plaintext_modulus),
+            delta=(np.uint64(1) << logq) // plaintext_modulus,
+            db_entries_per_zp_element=np.uint64(
+                element_config.db_entries_per_zp_element
+            ),
+            zp_elements_per_db_entry=np.uint64(
+                element_config.zp_elements_per_db_entry
+            ),
+            communication_x=np.uint64(element_config.zp_elements_per_db_entry),
+            compression_basis=np.uint64(10),
+            compression_squishing=np.uint64(3),
+            compression_columns=np.uint64(0),
+        )
         if plaintext_modulus < mod_p:
-            return Parameters(
-                lwe_secret_dimension=np.uint64(lwe_secret_dimension),
-                entries=np.uint64(entries),
-                bits_per_entry=np.uint64(bits_per_entry),
-                db_entries_per_logical_entry=np.uint64(db_entries_per_logical_entry),
-                db_rows=np.uint64(rows),
-                db_cols=np.uint64(cols),
-                logq=np.uint64(logq),
-                plaintext_modulus=np.uint64(plaintext_modulus),
-                delta=(np.uint64(1) << logq) // plaintext_modulus,
-                db_entries_per_zp_element=np.uint64(
-                    element_config.db_entries_per_zp_element
-                ),
-                zp_elements_per_db_entry=np.uint64(
-                    element_config.zp_elements_per_db_entry
-                ),
-                communication_x=np.uint64(element_config.zp_elements_per_db_entry),
-                compression_basis=np.uint64(10),
-                compression_squishing=np.uint64(3),
-                compression_columns=np.uint64(0),
-            )
+            return last_parameters
+        last_parameters = parameters
 
         mod_p += 1
