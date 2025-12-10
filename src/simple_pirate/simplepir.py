@@ -87,7 +87,7 @@ class SimplePirServer:
         self.A_key = lib.random_key()
         self.A = lib.shake_rand_mat(
             key=self.A_key,
-            cols=self.parameters.db_cols,
+            rows=self.parameters.db_cols,
             lwe_secret_dim=self.parameters.lwe_secret_dimension,
         )
 
@@ -168,7 +168,7 @@ class SimplePirClient:
 
         self.A = lib.shake_rand_mat(
             key=offline_data.A_key,
-            cols=self.parameters.db_cols,
+            rows=self.parameters.db_cols,
             lwe_secret_dim=self.parameters.lwe_secret_dimension,
         )
         self.hint = offline_data.hint

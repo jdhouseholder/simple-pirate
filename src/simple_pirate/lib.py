@@ -34,11 +34,11 @@ def shake_rand_rows(
     return out
 
 
-def shake_rand_mat(key: bytes, cols: int, lwe_secret_dim: int) -> np.ndarray:
+def shake_rand_mat(key: bytes, rows: int, lwe_secret_dim: int) -> np.ndarray:
     return shake_rand_rows(
         key=key,
         start=0,
-        stop=cols,
+        stop=rows,
         lwe_secret_dim=lwe_secret_dim,
     )
 
